@@ -1,0 +1,74 @@
+class BankAccount:
+
+    all_accounts = []
+
+    def __init__(self, account_number, account_owner, account_balance, account_type):
+        self.account_number = account_number
+        self.account_owner = account_owner
+        self.account_balance = account_balance
+        self.account_type = account_type
+
+        BankAccount.all_accounts.append(self)
+
+    def deposit(self, amount):
+        self.account_balance += amount
+        print("Withdrawn {}. New Balance: {}".format(self.account_number, self.account_balance))
+
+    def withdraw(self, amount):
+        if self.account_balance < amount:
+            print("You don't have enough money!")
+        elif self.account_balance >= amount:
+            self.account_balance -= amount
+
+def find_account_by_number(account_number):
+    for account in BankAccount.all_accounts:
+        if account.account_number == account_number:
+            return account
+    return None
+
+def main():
+    while True:
+        print("Would you like to create an account, manage an account, or leave?")
+        choice = input("Type 'create' to create an account, or 'manage' to manage an account, or 'leave' to leave: ")
+        if choice == 'create':
+            owner = input("Enter your name")
+            balance = 0
+            account_number = len(BankAccount.all_accounts) + 1
+            Type = input("Enter account type")
+            if Type == 'checking':
+                 account_type = "checking"
+            elif Type == 'savings':
+                account_type = "savings"
+
+            new_account = BankAccount(account_number, owner, balance, account_type)
+
+            print("Account created! Number: {}, Owner: {}, Balance: {}, Type: {}".
+                format(account_number, owner, balance, account_type))
+
+        elif choice == 'manage':
+            acct_num = int(input("Enter the account number you want to manage: "))
+            acct = find_account_by_number(acct_num)
+
+            if acct is not None:
+                print("Managing account {} for {}".format(acct.account_number, acct.account_owner))
+                while True:
+                    action = input("Type 'deposit' to deposit, 'withdraw' to withdraw,"
+                                    "'balance' to view balance, 'exit' to exit: ")
+                    if action == 'deposit':
+                        amount = float(input("Enter the amount to deposit: "))
+                        acct.deposit(amount)
+                    elif action == 'withdraw':
+                        amount = float(input("Enter the amount to withdraw: "))
+                        acct.withdraw(amount)
+                    elif action == 'balance':
+                        balance =  acct.account_balance
+                        print("Balance: ${}".format(balance))
+                    elif action == 'exit':
+                        break
+                    else:
+                        print("Invalid action")
+        elif choice == 'leave':
+            break
+
+if __name__ == '__main__':
+    main()
