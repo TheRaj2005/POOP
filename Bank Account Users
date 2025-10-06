@@ -1,0 +1,201 @@
+class Wallet:
+    
+    all_wallets = []
+    
+    
+    def __init__(self, wallet_owner, wallet_amount):
+        self.wallet_owner = wallet_owner
+        self.wallet_amount = wallet_amount
+        
+        Wallet.all_wallets.append(self)
+
+def load_accounts_from_file():
+    f = open("accounts.txt", "r")
+    lines = f.readlines()
+    f.close()
+    return [line.strip() for line in lines]
+
+def load_wallets_from_file():
+    f = open("wallets.txt", "r")
+    lines = f.readlines()
+    f.close()
+
+    Wallet.all_wallets = []
+
+    i = 0
+    while i < len(lines):
+        if i + 1 < len(lines):
+            wallet_owner = lines[i].strip()
+            wallet_amount = lines[i + 1].strip()
+            Wallet(wallet_owner, float(wallet_amount))
+        i += 2
+
+def save_wallets_to_file():
+    f = open("wallets.txt", "w")
+
+    i = 0
+    for wallet in Wallet.all_wallets:
+        f.write(wallet.wallet_owner + "\n")
+        f.write(str(wallet.wallet_amount))
+        if i < len(Wallet.all_wallets) - 1:
+            f.write("\n")
+
+    f.close()
+    print("Wallets saved to file.")
+
+def save_accounts_to_file(lines):
+    f = open("accounts.txt", "w")
+
+    i = 0
+    for line in lines:
+        f.write(line)
+        if i < len(lines) - 1:
+            f.write("\n")
+    f.close()
+    print("Accounts saved to file.")
+
+def login(lines):
+
+    username = input("Please enter your username: ")
+    password = input("Please enter your password: ")
+
+    account_data = None
+    login_successful = False
+
+    while not login_successful:
+
+        i = 0
+        while i < len(lines):
+
+            if i + 5 < len(lines):
+                if lines[i + 4] == username and lines [i+5] == password:
+                    login_successful = True
+                    account_data = {
+                        'account_number' : int(lines[i]),
+                        'account_owner' : lines[i+1],
+                        'account_balance' : float(lines[i+2]),
+                        'account_type' : lines[i+3],
+                        'account_username' : lines[i+4],
+                        'account_password' : lines[i+5],
+                    }
+                    print("Login Successful")
+
+            i += 6
+        if not login_successful:
+            print("Login Failed. Invalid username or password.")
+            leave = input("Enter 'L' to leave, or press Enter to try again: ")
+            if leave.upper() == "L":
+                return None
+
+    return account_data
+
+def find_or_create_wallet(username):
+    for wallet in Wallet.all_wallets:
+        if wallet.wallet_owner == username:
+            return wallet
+
+    new_wallet = Wallet(username, 0)
+    return new_wallet
+
+def deposit_to_wallet(wallet):
+
+    amount = float(input("Enter the amount you want to deposit into the wallet:"))
+    wallet.wallet_amount += amount
+    print("Deposited {} in wallet. New wallet balance: {}".format(amount, wallet.wallet_amount))
+
+def deposit_to_account(account_data, wallet, lines):
+
+    amount = float(input("Please enter your deposit amount: "))
+
+    if amount > wallet.wallet_amount:
+        print("You don't have enough funds to deposit.")
+
+    wallet.wallet_amount -= amount
+
+    account_data['account_balance'] += amount
+
+    account_index = None
+    for i in range(0, len(lines), 6):
+        if i + 4 < len(lines) and lines[i + 4] == account_data['account_username']:
+            account_index = i
+            break
+
+    if account_index is not None:
+            lines[account_index + 2] = str(account_data['account_balance'])
+
+    print("Deposited {} in account.".format(amount))
+    print("New Account Balance: {}".format(account_data['account_balance']))
+
+    return account_data, lines
+
+def withdraw_from_account(account_data, wallet, lines):
+
+    amount = float(input("Please enter the amount you want to withdraw: "))
+
+    if amount > account_data['account_balance']:
+        print("You don't have enough funds to withdraw.")
+        return account_data, lines
+
+    account_data['account_balance'] -= amount
+
+    wallet.wallet_amount += amount
+
+    account_index = None
+    for i in range(0, len(lines), 6):
+        if i + 4 < len(lines) and lines[i + 4] == account_data['account_username']:
+            account_index = i
+            break
+
+    if account_index is not None:
+        lines[account_index + 2] = str(account_data['account_balance'])
+        print("Withdrawn {} in account.".format(amount))
+        print("New Account Balance: {}".format(account_data['account_balance']))
+    return account_data, lines
+
+def main():
+
+    lines = load_accounts_from_file()
+    load_wallets_from_file()
+
+    account_data = login(lines)
+
+    wallet = find_or_create_wallet(account_data['account_username'])
+    print("Account Type : {}".format(account_data['account_type']))
+    print("Account Balance : {}".format(account_data['account_balance']))
+    print("Wallet Balance: {}".format(wallet.wallet_amount))
+
+    while True:
+
+        print("--- Main Menu ---")
+        print("1. Deposit to Wallet")
+        print("2. Deposit from Wallet to Account")
+        print("3. Withdraw from Account to Wallet")
+        print("4. Check Balances")
+        print("5. Exit")
+
+        choice = input("Enter your choice (A number between 1 and 5): ")
+
+        if choice == "1":
+            deposit_to_wallet(wallet)
+
+        elif choice == "2":
+            account_data, lines = deposit_to_account(account_data, wallet, lines)
+
+        elif choice == "3":
+            account_data, lines = withdraw_from_account(account_data, wallet, lines)
+
+        elif choice == "4":
+            print("Account Balance: {}".format(account_data['account_balance']))
+            print("Wallet Balance: {}".format(wallet.wallet_amount))
+
+        elif choice == "5":
+            save_accounts_to_file(lines)
+            save_wallets_to_file()
+            print("Changes saved")
+            break
+
+        else:
+            print("Invalid choice.")
+
+if __name__ == "__main__":
+    main()
