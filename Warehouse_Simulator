@@ -1,0 +1,232 @@
+class Product: #This defines a product
+    def __init__(self, sku, name, unitcost, leadtimedays, orderqty_q, reorderpoint_rop, initialonhand):
+        self.sku = sku #item number
+        self.name = name
+        self.unitcost = unitcost #item cost
+        self.leadtimedays = leadtimedays #time from order to arrival
+        self.orderqty_q = orderqty_q #
+        self.reorderpoint_rop = reorderpoint_rop # point at which stock needs resupply
+        self.initialonhand = initialonhand #starting inventory
+
+
+class Inventory: #This defines inventory that we have, or expect to have
+    def __init__(self):
+        self.on_hand = {} #What do we have. (Dictionary is for key-pair values)
+        self.on_order = {} #What (quantity) is incoming
+        self.pos_open = [] #What (orders) are incoming
+
+class SupplierPO: #This defines a specific order
+    def __init__(self, po_id, sku, qty, eta_day):
+        self.po_id = po_id #Purchase Order ID
+        self.sku = sku
+        self.qty = qty
+        self.eta_day = eta_day #Estimated day of arrival
+
+class OrderLine: # This defines a specific line of an order (Item / Quantity)
+    def __init__(self, sku, qty):
+        self.sku = sku
+        self.qty = qty
+
+class DayDemand: #This defines the demand for each individual day
+    def __init__(self, day, lines):
+        self.day = day #current day number
+        self.lines = lines #this is a list of OrderLine object
+
+class Warehouse: #This simulates the Warehouse itself
+    def __init__(self):
+        self.products = {} #this is a list of key-pair values (sku - quantity)
+        self.inventory = Inventory() #This is what is in the warehouse or expected to be
+        self.cost_params = {
+            "fixed_ordering_costs": 50, #This is the cost to make an order
+            "annual_carrying_rate": 0.20 #This is a various costs rate for the warehouse to hold the object for a year
+        }
+
+class Simulator: #This object actually runs the simulation
+    def __init__(self):
+        self.warehouse = Warehouse() #The warehouse itself
+        self.demands_by_day = {} #The demands on the warehouse
+        self.end_day = 14 # last day of simulation
+
+### Phase 1 (Initialization) ###
+
+def load_products(): #This method loads the product information from product.txt
+    f = open("products.txt", "r")
+    lines = f.readlines()
+    f.close()
+
+    products = {} #products is assigned a dictionary
+
+    i = 0
+    while i < len(lines): #grab the info from product.txt
+        product_sku = str(lines[i].strip())
+        product_name = str(lines[i + 1].strip())
+        product_unitcost = float(lines[i + 2].strip())
+        product_leadtimedays = int(lines[i + 3].strip())
+        product_orderqty_q = int(lines[i + 4].strip())
+        product_reorderpoint_rop = int(lines[i + 5].strip())
+        product_initialonhand = int(lines[i + 6].strip())
+
+        #Assign all the attributes to Product. Let product be an object.
+        product = Product(product_sku, product_name, product_unitcost, product_leadtimedays,
+            product_orderqty_q, product_reorderpoint_rop, product_initialonhand)
+
+        products[product_sku] = product #then create an object with the attributes of product and a primary key of product_sku
+
+        i += 8 #Finally, skip the blank line and start on the line after that
+
+    return products #and return products
+
+#This method loads the demand details including day, item, and quantity
+#It creates a dictionary of demands_by_day and fills it with a series of values with day as the primary key
+def load_demand():
+    f = open("demand.txt", "r") #Read the file
+    lines = f.readlines()
+    f.close()
+
+    lines = [line.strip() for line in lines] # strip the lines
+
+    demands_by_day = {} #assign demands_by_day a dicitonary
+
+    i = 0
+    while i < len(lines):
+
+        if lines[i] == "": #skip the blank line 
+            i += 1
+            continue
+
+        day = int(lines[i]) #count the first val after blank line as a day number
+        i += 1
+
+        order_lines = []
+        while i < len(lines) and lines[i] != "":
+            sku = lines[i] #then count the next as an sku
+            qty = int(lines[i + 1])# and the following as an qty
+            order_lines.append(OrderLine(sku, qty))
+            i += 2
+        #all the way until you get to the end or a blank line
+
+        demands_by_day[day] = DayDemand(day, order_lines) #Lastly, create an object from data, sortable by day
+
+    return demands_by_day #now return that object
+
+### Phase 2 (Daily Simulation Loop) ###
+
+
+
+def receive_orders(warehouse, current_day): #checks arriving orders and adds them to inventory
+    received_pos = [] # Holds all the POs which have been received. (The POs to remove)
+
+    for po in warehouse.inventory.pos_open: #for every purchase order in Inventory that is to be received
+
+        if po.eta_day == current_day: #if the arrival day is today
+
+            warehouse.inventory.on_hand[po.sku] += po.qty #add it to inventory
+            warehouse.inventory.on_order[po.sku] -= po.qty #and remove it from too be received
+
+            received_pos.append(po) #update the list of orders to be removed
+            print("Received {} units of {}".format(po.po_id, po.qty))
+
+    for po in received_pos:
+        warehouse.inventory.pos_open.remove(po) #actually remove the item from pos_open in Inventory
+
+def process_demand(warehouse, demands_by_day, current_day): #this fulfills customers orders
+
+    if current_day not in demands_by_day: #if there's no demand today, skip this whole method
+        return
+
+    day_demand = demands_by_day[current_day] #Pulls up all the order lines for this day
+
+    for order_line in day_demand.lines: #lines is the orders in day_demand
+        sku = order_line.sku #assign orderline SKU to new var called sku
+        qty = order_line.qty
+        on_hand = warehouse.inventory.on_hand.get(sku, 0) #0 is a default value incase sku is not found
+        #go in warehouse, into inventory, into on_hand, get sku, and assign quantity to 0
+
+        if on_hand >= qty: # if we have more items than the order quantity for today
+
+            warehouse.inventory.on_hand[sku] -= qty #reduce quantity from inventory on hand
+            print("Fulfilled: {} units of {}".format(qty, sku))
+
+        elif on_hand > 0:
+
+            warehouse.inventory.on_hand[sku] = 0
+            unfulfilled = qty - on_hand
+            print("Partial Fulfillment: Shipped {} of {} {}, short {}".format(on_hand, qty, sku, unfulfilled))
+
+        else:
+
+            print("STOCKOUT: Need {} of {}, we have 0 items with that sku".format(qty, sku))
+
+def check_reorder_points(warehouse, current_day, po_counter): #determine if any products need to be re-ordered
+
+    num_pos_created = 0
+    merch_spend_today = 0.0
+
+    for sku, product in warehouse.products.items(): #for every sku and its related product
+        on_hand = warehouse.inventory.on_hand.get(sku, 0)
+        on_order = warehouse.inventory.on_order.get(sku, 0)
+
+        inventory_position = on_order + on_hand
+
+        if inventory_position <= product.reorderpoint_rop:
+
+            po_id = "PO-{}".format(po_counter[0])
+            po_counter[0] += 1 #
+
+            eta_day = current_day + product.leadtimedays #calculate arrival date
+
+            new_po = SupplierPO(po_id, sku, product.orderqty_q, eta_day)
+
+            warehouse.inventory.pos_open.append(new_po) # Add a new position to be reordered
+            warehouse.inventory.on_order[sku] = on_order + product.orderqty_q
+
+            print("Ordered: {} units of {}, ETA day {}".format(product.orderqty_q, sku, eta_day))
+
+            num_pos_created += 1
+            merch_spend_today += (product.unitcost * product.orderqty_q)
+
+    return num_pos_created, merch_spend_today
+
+def run_simulation(): # this runs the simulation using the methods above and below
+    warehouse = Warehouse() #instantiates a warehouse object
+    warehouse.products = load_products() #instantiates the products in the warehouse
+    demands_by_day = load_demand() #loads demand for all the products
+    total_merch_spend = 0.0
+
+    for sku, product in warehouse.products.items(): # for every sku and its related product
+        warehouse.inventory.on_hand[sku] = product.initialonhand # Give product.inventory_on_hand info to warehouse
+        warehouse.inventory.on_order[sku] = 0 #assign 0 because we have no orders yet
+
+    total_ordering_cost = 0
+    total_holding_cost = 0
+    po_counter = [1]
+
+    sim = Simulator()
+    for current_day in range(sim.end_day): #print the day for each day
+        print("--- Day {} ---".format(current_day))
+
+        receive_orders(warehouse, current_day)
+
+        process_demand(warehouse, demands_by_day, current_day)
+
+        num_pos, merch_spend_today = check_reorder_points(warehouse, current_day, po_counter)
+        total_ordering_cost += num_pos * warehouse.cost_params["fixed_ordering_costs"]
+        total_merch_spend += merch_spend_today
+
+        daily_holding_cost = 0
+        for sku, product in warehouse.products.items():
+            on_hand = warehouse.inventory.on_hand.get(sku,0)
+            daily_cost = ((warehouse.cost_params["annual_carrying_rate"] * product.unitcost * on_hand) / 365)
+            daily_holding_cost += daily_cost
+
+        total_holding_cost += daily_holding_cost
+
+        print("End of day inventory : {}".format(warehouse.inventory.on_hand))
+
+    print("--- SIMULATION COMPLETE ---")
+    print("Total Ordering Cost: ${}".format(total_ordering_cost))
+    print("Total Holding Cost: ${}".format(total_holding_cost))
+    print("Total Merchandise Spend: ${}".format(total_merch_spend))
+    print("Total Cost: ${}".format(total_ordering_cost + total_holding_cost + total_merch_spend))
+
+run_simulation()
