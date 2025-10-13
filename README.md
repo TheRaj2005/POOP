@@ -15,4 +15,5 @@ how I structured the program later on.
 While the diagram includes some logic that wasn’t coded initially,
 it reflects the full business process as it would operate in a real
 supply chain environment.
+
 <img width="809" height="735" alt="image" src="https://github.com/user-attachments/assets/52c0c67c-3a62-4c20-ac18-1a5c802b1e22" />
